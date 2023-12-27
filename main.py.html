@@ -1,0 +1,338 @@
+<html>
+<head>
+<title>main.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #7a7e85;}
+.s4 { color: #2aacb8;}
+.s5 { color: #6aab73;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+main.py</font>
+</center></td></tr></table>
+<pre><span class="s0">import </span><span class="s1">threading</span>
+<span class="s0">import </span><span class="s1">tkinter </span><span class="s0">as </span><span class="s1">tk</span>
+<span class="s0">from </span><span class="s1">tkinter </span><span class="s0">import </span><span class="s1">Button</span><span class="s2">, </span><span class="s1">Label</span><span class="s2">, </span><span class="s1">StringVar</span><span class="s2">, </span><span class="s1">ttk</span><span class="s2">, </span><span class="s1">filedialog</span>
+<span class="s0">import </span><span class="s1">matplotlib</span><span class="s2">.</span><span class="s1">pyplot </span><span class="s0">as </span><span class="s1">plt</span>
+<span class="s0">import </span><span class="s1">numpy </span><span class="s0">as </span><span class="s1">np</span>
+<span class="s0">import </span><span class="s1">pandas </span><span class="s0">as </span><span class="s1">pd</span>
+<span class="s0">from </span><span class="s1">matplotlib</span><span class="s2">.</span><span class="s1">backends</span><span class="s2">.</span><span class="s1">backend_tkagg </span><span class="s0">import </span><span class="s1">FigureCanvasTkAgg</span>
+<span class="s0">from </span><span class="s1">numpy</span><span class="s2">.</span><span class="s1">ma</span><span class="s2">.</span><span class="s1">core </span><span class="s0">import </span><span class="s1">ceil</span>
+<span class="s0">from </span><span class="s1">scipy</span><span class="s2">.</span><span class="s1">spatial </span><span class="s0">import </span><span class="s1">distance</span>
+<span class="s0">from </span><span class="s1">sklearn</span><span class="s2">.</span><span class="s1">metrics </span><span class="s0">import </span><span class="s1">accuracy_score</span>
+<span class="s0">from </span><span class="s1">sklearn</span><span class="s2">.</span><span class="s1">model_selection </span><span class="s0">import </span><span class="s1">train_test_split</span>
+<span class="s0">from </span><span class="s1">sklearn</span><span class="s2">.</span><span class="s1">preprocessing </span><span class="s0">import </span><span class="s1">MinMaxScaler</span>
+<span class="s0">import </span><span class="s1">matplotlib</span><span class="s2">.</span><span class="s1">colors </span><span class="s0">as </span><span class="s1">mcolors</span>
+
+<span class="s1">is_paused </span><span class="s2">= </span><span class="s0">False</span>
+<span class="s1">progress_var </span><span class="s2">= </span><span class="s0">None</span>
+<span class="s1">som </span><span class="s2">= </span><span class="s0">None</span>
+<span class="s1">label_map </span><span class="s2">= </span><span class="s0">None</span>
+<span class="s1">fig </span><span class="s2">= </span><span class="s0">None  </span><span class="s3"># Added variable to store the figure</span>
+
+<span class="s3"># Function to scale data using Min-Max scaling</span>
+<span class="s0">def </span><span class="s1">minmax_scaler</span><span class="s2">(</span><span class="s1">data</span><span class="s2">):</span>
+    <span class="s3"># Separate numeric and non-numeric columns</span>
+    <span class="s1">numeric_cols </span><span class="s2">= </span><span class="s1">data</span><span class="s2">.</span><span class="s1">select_dtypes</span><span class="s2">(</span><span class="s1">include</span><span class="s2">=</span><span class="s1">np</span><span class="s2">.</span><span class="s1">number</span><span class="s2">).</span><span class="s1">columns</span>
+    <span class="s1">non_numeric_cols </span><span class="s2">= </span><span class="s1">list</span><span class="s2">(</span><span class="s1">set</span><span class="s2">(</span><span class="s1">data</span><span class="s2">.</span><span class="s1">columns</span><span class="s2">) - </span><span class="s1">set</span><span class="s2">(</span><span class="s1">numeric_cols</span><span class="s2">))</span>
+
+    <span class="s3"># Scale numeric columns</span>
+    <span class="s1">numeric_data </span><span class="s2">= </span><span class="s1">data</span><span class="s2">[</span><span class="s1">numeric_cols</span><span class="s2">]</span>
+    <span class="s1">scaler </span><span class="s2">= </span><span class="s1">MinMaxScaler</span><span class="s2">()</span>
+    <span class="s1">scaled_numeric </span><span class="s2">= </span><span class="s1">scaler</span><span class="s2">.</span><span class="s1">fit_transform</span><span class="s2">(</span><span class="s1">numeric_data</span><span class="s2">)</span>
+
+    <span class="s3"># Check for and replace NaN and infinite values</span>
+    <span class="s1">scaled_numeric </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">nan_to_num</span><span class="s2">(</span><span class="s1">scaled_numeric</span><span class="s2">)</span>
+
+    <span class="s3"># One-hot encode non-numeric columns</span>
+    <span class="s1">non_numeric_data </span><span class="s2">= </span><span class="s1">pd</span><span class="s2">.</span><span class="s1">get_dummies</span><span class="s2">(</span><span class="s1">data</span><span class="s2">[</span><span class="s1">non_numeric_cols</span><span class="s2">])</span>
+
+    <span class="s3"># Concatenate scaled numeric and one-hot encoded non-numeric data</span>
+    <span class="s1">scaled_data </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">concatenate</span><span class="s2">([</span><span class="s1">scaled_numeric</span><span class="s2">, </span><span class="s1">non_numeric_data</span><span class="s2">], </span><span class="s1">axis</span><span class="s2">=</span><span class="s4">1</span><span class="s2">)</span>
+
+    <span class="s0">return </span><span class="s1">scaled_data</span>
+
+<span class="s3"># Function to compute Euclidean distance</span>
+<span class="s0">def </span><span class="s1">e_distance</span><span class="s2">(</span><span class="s1">x</span><span class="s2">, </span><span class="s1">y</span><span class="s2">):</span>
+    <span class="s0">if </span><span class="s1">x</span><span class="s2">.</span><span class="s1">ndim </span><span class="s2">&gt; </span><span class="s4">1</span><span class="s2">:</span>
+        <span class="s1">x </span><span class="s2">= </span><span class="s1">x</span><span class="s2">.</span><span class="s1">flatten</span><span class="s2">()</span>
+    <span class="s0">if </span><span class="s1">y</span><span class="s2">.</span><span class="s1">ndim </span><span class="s2">&gt; </span><span class="s4">1</span><span class="s2">:</span>
+        <span class="s1">y </span><span class="s2">= </span><span class="s1">y</span><span class="s2">.</span><span class="s1">flatten</span><span class="s2">()</span>
+    <span class="s0">return </span><span class="s1">distance</span><span class="s2">.</span><span class="s1">euclidean</span><span class="s2">(</span><span class="s1">x</span><span class="s2">, </span><span class="s1">y</span><span class="s2">)</span>
+
+<span class="s3"># Function to compute Manhattan distance</span>
+<span class="s0">def </span><span class="s1">m_distance</span><span class="s2">(</span><span class="s1">x</span><span class="s2">, </span><span class="s1">y</span><span class="s2">):</span>
+    <span class="s0">return </span><span class="s1">distance</span><span class="s2">.</span><span class="s1">cityblock</span><span class="s2">(</span><span class="s1">x</span><span class="s2">, </span><span class="s1">y</span><span class="s2">)</span>
+
+<span class="s3"># Function to find the winning neuron in SOM</span>
+<span class="s0">def </span><span class="s1">winning_neuron</span><span class="s2">(</span><span class="s1">data</span><span class="s2">, </span><span class="s1">t</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">):</span>
+    <span class="s1">winner </span><span class="s2">= [</span><span class="s4">0</span><span class="s2">, </span><span class="s4">0</span><span class="s2">]</span>
+    <span class="s1">shortest_distance </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">sqrt</span><span class="s2">(</span><span class="s1">data</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">1</span><span class="s2">])</span>
+    <span class="s1">input_data </span><span class="s2">= </span><span class="s1">data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">][:, </span><span class="s1">np</span><span class="s2">.</span><span class="s1">newaxis</span><span class="s2">] </span><span class="s0">if </span><span class="s1">data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">].</span><span class="s1">ndim </span><span class="s2">== </span><span class="s4">1 </span><span class="s0">else </span><span class="s1">data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">]</span>
+    <span class="s0">for </span><span class="s1">row </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">num_rows</span><span class="s2">):</span>
+        <span class="s0">for </span><span class="s1">col </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">num_cols</span><span class="s2">):</span>
+            <span class="s1">dist </span><span class="s2">= </span><span class="s1">e_distance</span><span class="s2">(</span><span class="s1">som</span><span class="s2">[</span><span class="s1">row</span><span class="s2">][</span><span class="s1">col</span><span class="s2">], </span><span class="s1">input_data</span><span class="s2">)</span>
+            <span class="s0">if </span><span class="s1">dist </span><span class="s2">&lt; </span><span class="s1">shortest_distance</span><span class="s2">:</span>
+                <span class="s1">shortest_distance </span><span class="s2">= </span><span class="s1">dist</span>
+                <span class="s1">winner </span><span class="s2">= [</span><span class="s1">row</span><span class="s2">, </span><span class="s1">col</span><span class="s2">]</span>
+    <span class="s0">return </span><span class="s1">winner</span>
+
+<span class="s3"># Function to decay learning rate and neighborhood range</span>
+<span class="s0">def </span><span class="s1">decay</span><span class="s2">(</span><span class="s1">step</span><span class="s2">, </span><span class="s1">max_steps</span><span class="s2">, </span><span class="s1">max_learning_rate</span><span class="s2">, </span><span class="s1">max_neighbourhood_range</span><span class="s2">):</span>
+    <span class="s1">coefficient </span><span class="s2">= </span><span class="s4">1.0 </span><span class="s2">- (</span><span class="s1">np</span><span class="s2">.</span><span class="s1">float64</span><span class="s2">(</span><span class="s1">step</span><span class="s2">) / </span><span class="s1">max_steps</span><span class="s2">)</span>
+    <span class="s1">learning_rate </span><span class="s2">= </span><span class="s1">coefficient </span><span class="s2">* </span><span class="s1">max_learning_rate</span>
+    <span class="s1">neighbourhood_range </span><span class="s2">= </span><span class="s1">ceil</span><span class="s2">(</span><span class="s1">coefficient </span><span class="s2">* </span><span class="s1">max_neighbourhood_range</span><span class="s2">)</span>
+    <span class="s0">return </span><span class="s1">learning_rate</span><span class="s2">, </span><span class="s1">neighbourhood_range</span>
+
+<span class="s3"># Function to train Self-Organizing Map (SOM)</span>
+<span class="s0">def </span><span class="s1">som_training</span><span class="s2">(</span><span class="s1">train_data</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">, </span><span class="s1">max_neighbourhood_range</span><span class="s2">, </span><span class="s1">max_learning_rate</span><span class="s2">, </span><span class="s1">max_steps</span><span class="s2">, </span><span class="s1">label_var</span><span class="s2">,</span>
+                 <span class="s1">train_y</span><span class="s2">=</span><span class="s0">None</span><span class="s2">):</span>
+    <span class="s0">global </span><span class="s1">som</span><span class="s2">, </span><span class="s1">label_map</span>
+    <span class="s1">num_dims </span><span class="s2">= </span><span class="s1">train_data</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">1</span><span class="s2">]</span>
+    <span class="s1">np</span><span class="s2">.</span><span class="s1">random</span><span class="s2">.</span><span class="s1">seed</span><span class="s2">(</span><span class="s4">40</span><span class="s2">)</span>
+    <span class="s1">som </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">random</span><span class="s2">.</span><span class="s1">random_sample</span><span class="s2">(</span><span class="s1">size</span><span class="s2">=(</span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">, </span><span class="s1">num_dims</span><span class="s2">))</span>
+
+    <span class="s0">for </span><span class="s1">step </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">max_steps</span><span class="s2">):</span>
+        <span class="s0">if </span><span class="s1">is_paused</span><span class="s2">:</span>
+            <span class="s0">continue  </span><span class="s3"># Skip the iteration if paused</span>
+
+        <span class="s1">progress_var</span><span class="s2">.</span><span class="s1">set</span><span class="s2">((</span><span class="s1">step </span><span class="s2">+ </span><span class="s4">1</span><span class="s2">) / </span><span class="s1">max_steps </span><span class="s2">* </span><span class="s4">100</span><span class="s2">)  </span><span class="s3"># Update progress bar</span>
+
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">step </span><span class="s2">+ </span><span class="s4">1</span><span class="s2">) % </span><span class="s4">1000 </span><span class="s2">== </span><span class="s4">0</span><span class="s2">:</span>
+            <span class="s1">label_var</span><span class="s2">.</span><span class="s1">set</span><span class="s2">(</span><span class="s5">f&quot;Iteration: </span><span class="s0">{</span><span class="s1">step </span><span class="s2">+ </span><span class="s4">1</span><span class="s0">}</span><span class="s5">&quot;</span><span class="s2">)</span>
+            <span class="s1">root</span><span class="s2">.</span><span class="s1">update</span><span class="s2">()  </span><span class="s3"># Update the Tkinter GUI</span>
+
+        <span class="s1">learning_rate</span><span class="s2">, </span><span class="s1">neighbourhood_range </span><span class="s2">= </span><span class="s1">decay</span><span class="s2">(</span><span class="s1">step</span><span class="s2">, </span><span class="s1">max_steps</span><span class="s2">, </span><span class="s1">max_learning_rate</span><span class="s2">, </span><span class="s1">max_neighbourhood_range</span><span class="s2">)</span>
+
+        <span class="s1">t </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">random</span><span class="s2">.</span><span class="s1">randint</span><span class="s2">(</span><span class="s4">0</span><span class="s2">, </span><span class="s1">high</span><span class="s2">=</span><span class="s1">train_data</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">0</span><span class="s2">])</span>
+        <span class="s1">winner </span><span class="s2">= </span><span class="s1">winning_neuron</span><span class="s2">(</span><span class="s1">train_data</span><span class="s2">, </span><span class="s1">t</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">)</span>
+
+        <span class="s0">for </span><span class="s1">row </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">num_rows</span><span class="s2">):</span>
+            <span class="s0">for </span><span class="s1">col </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">num_cols</span><span class="s2">):</span>
+                <span class="s0">if </span><span class="s1">m_distance</span><span class="s2">([</span><span class="s1">row</span><span class="s2">, </span><span class="s1">col</span><span class="s2">], </span><span class="s1">winner</span><span class="s2">) &lt;= </span><span class="s1">neighbourhood_range</span><span class="s2">:</span>
+                    <span class="s1">som</span><span class="s2">[</span><span class="s1">row</span><span class="s2">][</span><span class="s1">col</span><span class="s2">] += </span><span class="s1">learning_rate </span><span class="s2">* (</span><span class="s1">train_data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">] - </span><span class="s1">som</span><span class="s2">[</span><span class="s1">row</span><span class="s2">][</span><span class="s1">col</span><span class="s2">])</span>
+
+    <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;SOM training completed&quot;</span><span class="s2">)</span>
+    <span class="s1">label_var</span><span class="s2">.</span><span class="s1">set</span><span class="s2">(</span><span class="s5">&quot;SOM training completed&quot;</span><span class="s2">)</span>
+
+    <span class="s3"># Label the SOM nodes</span>
+    <span class="s1">label_map </span><span class="s2">= </span><span class="s1">label_som_nodes</span><span class="s2">(</span><span class="s1">train_data</span><span class="s2">, </span><span class="s1">train_y</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">, </span><span class="s1">som</span><span class="s2">)</span>
+    <span class="s0">return </span><span class="s1">som</span><span class="s2">, </span><span class="s1">label_map</span>
+
+<span class="s3"># Function to label SOM nodes</span>
+<span class="s0">def </span><span class="s1">label_som_nodes</span><span class="s2">(</span><span class="s1">train_data_norm</span><span class="s2">, </span><span class="s1">train_y</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">, </span><span class="s1">som</span><span class="s2">):</span>
+    <span class="s1">label_map </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">full</span><span class="s2">((</span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">), </span><span class="s0">None</span><span class="s2">, </span><span class="s1">dtype</span><span class="s2">=</span><span class="s1">object</span><span class="s2">)</span>
+
+    <span class="s0">for </span><span class="s1">t </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">train_data_norm</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">0</span><span class="s2">]):</span>
+        <span class="s1">winner </span><span class="s2">= </span><span class="s1">winning_neuron</span><span class="s2">(</span><span class="s1">train_data_norm</span><span class="s2">, </span><span class="s1">t</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">)</span>
+        <span class="s1">row</span><span class="s2">, </span><span class="s1">col </span><span class="s2">= </span><span class="s1">winner</span>
+        <span class="s1">label </span><span class="s2">= </span><span class="s1">train_y</span><span class="s2">.</span><span class="s1">iloc</span><span class="s2">[</span><span class="s1">t</span><span class="s2">].</span><span class="s1">item</span><span class="s2">()  </span><span class="s3"># Convert Series to a simple value</span>
+
+        <span class="s0">if </span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">row</span><span class="s2">, </span><span class="s1">col</span><span class="s2">] </span><span class="s0">is None</span><span class="s2">:</span>
+            <span class="s1">label_map</span><span class="s2">[</span><span class="s1">row</span><span class="s2">, </span><span class="s1">col</span><span class="s2">] = {</span><span class="s1">label</span><span class="s2">: </span><span class="s4">1</span><span class="s2">}</span>
+        <span class="s0">else</span><span class="s2">:</span>
+            <span class="s1">label_counts </span><span class="s2">= </span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">row</span><span class="s2">, </span><span class="s1">col</span><span class="s2">]</span>
+            <span class="s0">if </span><span class="s1">label </span><span class="s0">in </span><span class="s1">label_counts</span><span class="s2">:</span>
+                <span class="s1">label_counts</span><span class="s2">[</span><span class="s1">label</span><span class="s2">] += </span><span class="s4">1</span>
+            <span class="s0">else</span><span class="s2">:</span>
+                <span class="s1">label_counts</span><span class="s2">[</span><span class="s1">label</span><span class="s2">] = </span><span class="s4">1</span>
+
+    <span class="s0">for </span><span class="s1">i </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">num_rows</span><span class="s2">):</span>
+        <span class="s0">for </span><span class="s1">j </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">num_cols</span><span class="s2">):</span>
+            <span class="s0">if </span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">] </span><span class="s0">is not None</span><span class="s2">:</span>
+                <span class="s1">label_map</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">] = </span><span class="s1">max</span><span class="s2">(</span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">], </span><span class="s1">key</span><span class="s2">=</span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">].</span><span class="s1">get</span><span class="s2">)</span>
+
+    <span class="s0">return </span><span class="s1">label_map</span>
+
+<span class="s3"># Function to evaluate accuracy on the test set</span>
+<span class="s0">def </span><span class="s1">evaluate_accuracy</span><span class="s2">(</span><span class="s1">test_data</span><span class="s2">, </span><span class="s1">test_y</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">label_map</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">):</span>
+    <span class="s1">winner_labels </span><span class="s2">= []</span>
+
+    <span class="s0">for </span><span class="s1">t </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">test_data</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">0</span><span class="s2">]):</span>
+        <span class="s1">input_data </span><span class="s2">= </span><span class="s1">test_data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">][:, </span><span class="s1">np</span><span class="s2">.</span><span class="s1">newaxis</span><span class="s2">] </span><span class="s0">if </span><span class="s1">test_data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">].</span><span class="s1">ndim </span><span class="s2">== </span><span class="s4">1 </span><span class="s0">else </span><span class="s1">test_data</span><span class="s2">[</span><span class="s1">t</span><span class="s2">]</span>
+        <span class="s1">winner </span><span class="s2">= </span><span class="s1">winning_neuron</span><span class="s2">(</span><span class="s1">input_data</span><span class="s2">, </span><span class="s1">t</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">)</span>
+        <span class="s1">row </span><span class="s2">= </span><span class="s1">winner</span><span class="s2">[</span><span class="s4">0</span><span class="s2">]</span>
+        <span class="s1">col </span><span class="s2">= </span><span class="s1">winner</span><span class="s2">[</span><span class="s4">1</span><span class="s2">]</span>
+        <span class="s1">predicted </span><span class="s2">= </span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">row</span><span class="s2">][</span><span class="s1">col</span><span class="s2">]</span>
+
+        <span class="s3"># Check for None values and assign a default label if needed</span>
+        <span class="s0">if </span><span class="s1">predicted </span><span class="s0">is None</span><span class="s2">:</span>
+            <span class="s1">predicted </span><span class="s2">= </span><span class="s5">'default_label'</span>
+
+        <span class="s1">winner_labels</span><span class="s2">.</span><span class="s1">append</span><span class="s2">(</span><span class="s1">predicted</span><span class="s2">)</span>
+
+    <span class="s3"># Convert labels to numeric values, treating 'default_label' as a separate category</span>
+    <span class="s1">unique_labels_test </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">unique</span><span class="s2">(</span><span class="s1">test_y</span><span class="s2">)</span>
+    <span class="s1">label_dict_test </span><span class="s2">= {</span><span class="s1">label</span><span class="s2">: </span><span class="s1">idx </span><span class="s0">for </span><span class="s1">idx</span><span class="s2">, </span><span class="s1">label </span><span class="s0">in </span><span class="s1">enumerate</span><span class="s2">(</span><span class="s1">unique_labels_test</span><span class="s2">)}</span>
+    <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Unique labels in test set:&quot;</span><span class="s2">, </span><span class="s1">unique_labels_test</span><span class="s2">)</span>
+    <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Unique predicted labels:&quot;</span><span class="s2">, </span><span class="s1">np</span><span class="s2">.</span><span class="s1">unique</span><span class="s2">(</span><span class="s1">winner_labels</span><span class="s2">))</span>
+    <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Numeric value for 'default_label':&quot;</span><span class="s2">, </span><span class="s1">label_dict_test</span><span class="s2">.</span><span class="s1">get</span><span class="s2">(</span><span class="s5">'default_label'</span><span class="s2">, </span><span class="s1">len</span><span class="s2">(</span><span class="s1">unique_labels_test</span><span class="s2">)))</span>
+
+    <span class="s1">winner_labels_numeric </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">array</span><span class="s2">([</span><span class="s1">label_dict_test</span><span class="s2">.</span><span class="s1">get</span><span class="s2">(</span><span class="s1">label</span><span class="s2">, </span><span class="s1">len</span><span class="s2">(</span><span class="s1">unique_labels_test</span><span class="s2">)) </span><span class="s0">for </span><span class="s1">label </span><span class="s0">in </span><span class="s1">winner_labels</span><span class="s2">])</span>
+
+    <span class="s0">if </span><span class="s5">'default_label' </span><span class="s0">not in </span><span class="s1">label_dict_test</span><span class="s2">:</span>
+        <span class="s1">winner_labels_numeric</span><span class="s2">[</span><span class="s1">winner_labels_numeric </span><span class="s2">== </span><span class="s1">len</span><span class="s2">(</span><span class="s1">unique_labels_test</span><span class="s2">)] = -</span><span class="s4">1  </span><span class="s3"># Set default label to -1</span>
+
+    <span class="s1">accuracy </span><span class="s2">= </span><span class="s1">accuracy_score</span><span class="s2">(</span><span class="s1">test_y</span><span class="s2">, </span><span class="s1">winner_labels_numeric</span><span class="s2">)</span>
+    <span class="s0">return </span><span class="s1">accuracy</span>
+
+<span class="s3"># Function to display SOM Plot GUI</span>
+<span class="s0">def </span><span class="s1">display_som_plot_gui_func</span><span class="s2">(</span><span class="s1">label_map</span><span class="s2">, </span><span class="s1">max_steps</span><span class="s2">):</span>
+    <span class="s0">global </span><span class="s1">root</span><span class="s2">, </span><span class="s1">fig</span>
+    <span class="s1">cmap </span><span class="s2">= </span><span class="s1">mcolors</span><span class="s2">.</span><span class="s1">ListedColormap</span><span class="s2">(</span>
+        <span class="s2">[</span><span class="s5">'white'</span><span class="s2">, </span><span class="s5">'black'</span><span class="s2">, </span><span class="s5">'red'</span><span class="s2">, </span><span class="s5">'green'</span><span class="s2">, </span><span class="s5">'blue'</span><span class="s2">, </span><span class="s5">'yellow'</span><span class="s2">, </span><span class="s5">'purple'</span><span class="s2">, </span><span class="s5">'orange'</span><span class="s2">, </span><span class="s5">'brown'</span><span class="s2">, </span><span class="s5">'pink'</span><span class="s2">])</span>
+
+    <span class="s3"># Check if label_map is None</span>
+    <span class="s0">if </span><span class="s1">label_map </span><span class="s0">is None</span><span class="s2">:</span>
+        <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Error: label_map is None. Make sure SOM training is completed.&quot;</span><span class="s2">)</span>
+        <span class="s0">return</span>
+
+    <span class="s3"># Convert labels to numeric values</span>
+    <span class="s1">label_map_numeric </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">zeros_like</span><span class="s2">(</span><span class="s1">label_map</span><span class="s2">, </span><span class="s1">dtype</span><span class="s2">=</span><span class="s1">float</span><span class="s2">)</span>
+    <span class="s1">unique_labels </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">unique</span><span class="s2">([</span><span class="s1">label </span><span class="s0">for </span><span class="s1">row </span><span class="s0">in </span><span class="s1">label_map </span><span class="s0">for </span><span class="s1">label </span><span class="s0">in </span><span class="s1">row </span><span class="s0">if </span><span class="s1">label </span><span class="s0">is not None</span><span class="s2">])</span>
+
+    <span class="s3"># Handle the case when unique_labels is empty</span>
+    <span class="s0">if </span><span class="s1">unique_labels</span><span class="s2">.</span><span class="s1">size </span><span class="s2">== </span><span class="s4">0</span><span class="s2">:</span>
+        <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Error: No unique labels found in label_map.&quot;</span><span class="s2">)</span>
+        <span class="s0">return</span>
+
+    <span class="s1">label_dict </span><span class="s2">= {</span><span class="s1">label</span><span class="s2">: </span><span class="s1">idx </span><span class="s0">for </span><span class="s1">idx</span><span class="s2">, </span><span class="s1">label </span><span class="s0">in </span><span class="s1">enumerate</span><span class="s2">(</span><span class="s1">unique_labels</span><span class="s2">)}</span>
+
+    <span class="s0">for </span><span class="s1">i </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">label_map</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">0</span><span class="s2">]):</span>
+        <span class="s0">for </span><span class="s1">j </span><span class="s0">in </span><span class="s1">range</span><span class="s2">(</span><span class="s1">label_map</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">[</span><span class="s4">1</span><span class="s2">]):</span>
+            <span class="s0">if </span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">] </span><span class="s0">is not None</span><span class="s2">:</span>
+                <span class="s1">label_map_numeric</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">] = </span><span class="s1">label_dict</span><span class="s2">[</span><span class="s1">label_map</span><span class="s2">[</span><span class="s1">i</span><span class="s2">, </span><span class="s1">j</span><span class="s2">]]</span>
+
+    <span class="s3"># Create a new figure</span>
+    <span class="s1">fig</span><span class="s2">, </span><span class="s1">ax </span><span class="s2">= </span><span class="s1">plt</span><span class="s2">.</span><span class="s1">subplots</span><span class="s2">(</span><span class="s4">2</span><span class="s2">, </span><span class="s4">1</span><span class="s2">, </span><span class="s1">gridspec_kw</span><span class="s2">={</span><span class="s5">'height_ratios'</span><span class="s2">: [</span><span class="s4">4</span><span class="s2">, </span><span class="s4">1</span><span class="s2">]})</span>
+
+    <span class="s1">im </span><span class="s2">= </span><span class="s1">ax</span><span class="s2">[</span><span class="s4">0</span><span class="s2">].</span><span class="s1">imshow</span><span class="s2">(</span><span class="s1">label_map_numeric</span><span class="s2">, </span><span class="s1">cmap</span><span class="s2">=</span><span class="s1">cmap</span><span class="s2">)</span>
+    <span class="s1">cbar </span><span class="s2">= </span><span class="s1">plt</span><span class="s2">.</span><span class="s1">colorbar</span><span class="s2">(</span><span class="s1">im</span><span class="s2">, </span><span class="s1">ax</span><span class="s2">=</span><span class="s1">ax</span><span class="s2">[</span><span class="s4">0</span><span class="s2">], </span><span class="s1">ticks</span><span class="s2">=</span><span class="s1">range</span><span class="s2">(</span><span class="s1">len</span><span class="s2">(</span><span class="s1">unique_labels</span><span class="s2">)), </span><span class="s1">label</span><span class="s2">=</span><span class="s5">'Labels'</span><span class="s2">)</span>
+    <span class="s1">ax</span><span class="s2">[</span><span class="s4">0</span><span class="s2">].</span><span class="s1">set_title</span><span class="s2">(</span><span class="s5">f'SOM after </span><span class="s0">{</span><span class="s1">max_steps</span><span class="s0">} </span><span class="s5">iterations'</span><span class="s2">)</span>
+
+    <span class="s3"># Create a horizontal bar chart to show label frequencies</span>
+    <span class="s1">label_counts </span><span class="s2">= [</span><span class="s1">np</span><span class="s2">.</span><span class="s1">sum</span><span class="s2">(</span><span class="s1">label_map </span><span class="s2">== </span><span class="s1">label</span><span class="s2">) </span><span class="s0">for </span><span class="s1">label </span><span class="s0">in </span><span class="s1">unique_labels</span><span class="s2">]</span>
+    <span class="s1">colors </span><span class="s2">= </span><span class="s1">plt</span><span class="s2">.</span><span class="s1">cm</span><span class="s2">.</span><span class="s1">viridis</span><span class="s2">(</span><span class="s1">np</span><span class="s2">.</span><span class="s1">linspace</span><span class="s2">(</span><span class="s4">0</span><span class="s2">, </span><span class="s4">1</span><span class="s2">, </span><span class="s1">len</span><span class="s2">(</span><span class="s1">unique_labels</span><span class="s2">)))</span>
+
+    <span class="s1">ax</span><span class="s2">[</span><span class="s4">1</span><span class="s2">].</span><span class="s1">barh</span><span class="s2">(</span><span class="s1">unique_labels</span><span class="s2">, </span><span class="s1">label_counts</span><span class="s2">, </span><span class="s1">color</span><span class="s2">=</span><span class="s1">colors</span><span class="s2">)</span>
+    <span class="s1">ax</span><span class="s2">[</span><span class="s4">1</span><span class="s2">].</span><span class="s1">set_yticks</span><span class="s2">(</span><span class="s1">unique_labels</span><span class="s2">)</span>
+    <span class="s1">ax</span><span class="s2">[</span><span class="s4">1</span><span class="s2">].</span><span class="s1">set_ylabel</span><span class="s2">(</span><span class="s5">'Labels'</span><span class="s2">)</span>
+    <span class="s1">ax</span><span class="s2">[</span><span class="s4">1</span><span class="s2">].</span><span class="s1">set_xlabel</span><span class="s2">(</span><span class="s5">'Frequency'</span><span class="s2">)</span>
+
+    <span class="s3"># Create a Tkinter canvas widget</span>
+    <span class="s1">canvas </span><span class="s2">= </span><span class="s1">FigureCanvasTkAgg</span><span class="s2">(</span><span class="s1">fig</span><span class="s2">, </span><span class="s1">master</span><span class="s2">=</span><span class="s1">root</span><span class="s2">)</span>
+    <span class="s1">canvas_widget </span><span class="s2">= </span><span class="s1">canvas</span><span class="s2">.</span><span class="s1">get_tk_widget</span><span class="s2">()</span>
+    <span class="s1">canvas_widget</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s3"># Create a download button</span>
+    <span class="s1">download_button </span><span class="s2">= </span><span class="s1">Button</span><span class="s2">(</span><span class="s1">root</span><span class="s2">, </span><span class="s1">text</span><span class="s2">=</span><span class="s5">&quot;Download Graph&quot;</span><span class="s2">, </span><span class="s1">command</span><span class="s2">=</span><span class="s0">lambda</span><span class="s2">: </span><span class="s1">download_graph</span><span class="s2">(</span><span class="s1">fig</span><span class="s2">))</span>
+    <span class="s1">download_button</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s0">def </span><span class="s1">update_canvas</span><span class="s2">():</span>
+        <span class="s1">canvas</span><span class="s2">.</span><span class="s1">draw</span><span class="s2">()</span>
+
+    <span class="s3"># Schedule the Matplotlib code to run in the main thread</span>
+    <span class="s1">root</span><span class="s2">.</span><span class="s1">after</span><span class="s2">(</span><span class="s4">100</span><span class="s2">, </span><span class="s1">update_canvas</span><span class="s2">)</span>
+
+    <span class="s3"># Function to download the graph</span>
+    <span class="s0">def </span><span class="s1">download_graph</span><span class="s2">(</span><span class="s1">figure</span><span class="s2">):</span>
+        <span class="s1">file_path </span><span class="s2">= </span><span class="s1">filedialog</span><span class="s2">.</span><span class="s1">asksaveasfilename</span><span class="s2">(</span><span class="s1">defaultextension</span><span class="s2">=</span><span class="s5">&quot;.png&quot;</span><span class="s2">, </span><span class="s1">filetypes</span><span class="s2">=[(</span><span class="s5">&quot;PNG files&quot;</span><span class="s2">, </span><span class="s5">&quot;*.png&quot;</span><span class="s2">)])</span>
+        <span class="s0">if </span><span class="s1">file_path</span><span class="s2">:</span>
+            <span class="s1">figure</span><span class="s2">.</span><span class="s1">savefig</span><span class="s2">(</span><span class="s1">file_path</span><span class="s2">, </span><span class="s1">bbox_inches</span><span class="s2">=</span><span class="s5">'tight'</span><span class="s2">)</span>
+            <span class="s1">print</span><span class="s2">(</span><span class="s5">f&quot;Graph saved to: </span><span class="s0">{</span><span class="s1">file_path</span><span class="s0">}</span><span class="s5">&quot;</span><span class="s2">)</span>
+
+<span class="s3"># Function to be called when the button is clicked</span>
+<span class="s0">def </span><span class="s1">on_button_click</span><span class="s2">(</span><span class="s1">label_var</span><span class="s2">):</span>
+    <span class="s0">global </span><span class="s1">is_paused</span><span class="s2">, </span><span class="s1">progress_var</span><span class="s2">, </span><span class="s1">root</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">label_map</span>
+
+    <span class="s3"># Reset global variables</span>
+    <span class="s1">is_paused </span><span class="s2">= </span><span class="s0">False</span>
+
+    <span class="s3"># Create a progress bar</span>
+    <span class="s1">progress_var </span><span class="s2">= </span><span class="s1">tk</span><span class="s2">.</span><span class="s1">DoubleVar</span><span class="s2">()</span>
+    <span class="s1">progress_bar </span><span class="s2">= </span><span class="s1">ttk</span><span class="s2">.</span><span class="s1">Progressbar</span><span class="s2">(</span><span class="s1">root</span><span class="s2">, </span><span class="s1">variable</span><span class="s2">=</span><span class="s1">progress_var</span><span class="s2">, </span><span class="s1">maximum</span><span class="s2">=</span><span class="s4">100</span><span class="s2">)</span>
+    <span class="s1">progress_bar</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s3"># Create a thread for SOM training</span>
+    <span class="s1">som_thread </span><span class="s2">= </span><span class="s1">threading</span><span class="s2">.</span><span class="s1">Thread</span><span class="s2">(</span><span class="s1">target</span><span class="s2">=</span><span class="s1">som_training_thread</span><span class="s2">, </span><span class="s1">args</span><span class="s2">=(</span><span class="s1">label_var</span><span class="s2">,))</span>
+    <span class="s1">som_thread</span><span class="s2">.</span><span class="s1">start</span><span class="s2">()</span>
+
+<span class="s3"># Function to pause SOM training</span>
+<span class="s0">def </span><span class="s1">on_pause_click</span><span class="s2">():</span>
+    <span class="s0">global </span><span class="s1">is_paused</span>
+    <span class="s1">is_paused </span><span class="s2">= </span><span class="s0">not </span><span class="s1">is_paused</span>
+
+<span class="s3"># Function to run SOM training in a separate thread</span>
+<span class="s0">def </span><span class="s1">som_training_thread</span><span class="s2">(</span><span class="s1">label_var</span><span class="s2">):</span>
+    <span class="s0">global </span><span class="s1">som</span><span class="s2">, </span><span class="s1">label_map</span>
+
+    <span class="s3"># Load dataset</span>
+    <span class="s0">from </span><span class="s1">ucimlrepo </span><span class="s0">import </span><span class="s1">fetch_ucirepo</span>
+    <span class="s1">automobile </span><span class="s2">= </span><span class="s1">fetch_ucirepo</span><span class="s2">(</span><span class="s1">id</span><span class="s2">=</span><span class="s4">10</span><span class="s2">)</span>
+    <span class="s1">X </span><span class="s2">= </span><span class="s1">automobile</span><span class="s2">.</span><span class="s1">data</span><span class="s2">.</span><span class="s1">features</span>
+    <span class="s1">y </span><span class="s2">= </span><span class="s1">automobile</span><span class="s2">.</span><span class="s1">data</span><span class="s2">.</span><span class="s1">targets</span>
+
+    <span class="s3"># Split the dataset into training and testing sets</span>
+    <span class="s1">train_x</span><span class="s2">, </span><span class="s1">test_x</span><span class="s2">, </span><span class="s1">train_y</span><span class="s2">, </span><span class="s1">test_y </span><span class="s2">= </span><span class="s1">train_test_split</span><span class="s2">(</span><span class="s1">X</span><span class="s2">, </span><span class="s1">y</span><span class="s2">, </span><span class="s1">test_size</span><span class="s2">=</span><span class="s4">0.2</span><span class="s2">, </span><span class="s1">random_state</span><span class="s2">=</span><span class="s4">42</span><span class="s2">)</span>
+    <span class="s1">print</span><span class="s2">(</span><span class="s1">train_x</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">, </span><span class="s1">train_y</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">, </span><span class="s1">test_x</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">, </span><span class="s1">test_y</span><span class="s2">.</span><span class="s1">shape</span><span class="s2">)  </span><span class="s3"># check the shapes</span>
+
+    <span class="s0">if </span><span class="s1">train_y </span><span class="s0">is None</span><span class="s2">:</span>
+        <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Error: 'train_y' is None. Make sure the dataset is loaded correctly.&quot;</span><span class="s2">)</span>
+        <span class="s0">return</span>
+
+    <span class="s3"># Hyperparameters for SOM</span>
+    <span class="s1">num_rows </span><span class="s2">= </span><span class="s4">10</span>
+    <span class="s1">num_cols </span><span class="s2">= </span><span class="s4">10</span>
+    <span class="s1">max_neighbourhood_range </span><span class="s2">= </span><span class="s4">4</span>
+    <span class="s1">max_learning_rate </span><span class="s2">= </span><span class="s4">0.5</span>
+    <span class="s1">max_steps </span><span class="s2">= </span><span class="s1">int</span><span class="s2">(</span><span class="s4">7.5 </span><span class="s2">* </span><span class="s4">10e3</span><span class="s2">)</span>
+
+    <span class="s3"># Train SOM</span>
+    <span class="s1">train_data </span><span class="s2">= </span><span class="s1">pd</span><span class="s2">.</span><span class="s1">concat</span><span class="s2">([</span><span class="s1">train_x</span><span class="s2">, </span><span class="s1">train_y</span><span class="s2">], </span><span class="s1">axis</span><span class="s2">=</span><span class="s4">1</span><span class="s2">)</span>
+    <span class="s1">train_data_norm </span><span class="s2">= </span><span class="s1">minmax_scaler</span><span class="s2">(</span><span class="s1">train_data</span><span class="s2">)</span>
+    <span class="s1">som</span><span class="s2">, </span><span class="s1">label_map </span><span class="s2">= </span><span class="s1">som_training</span><span class="s2">(</span><span class="s1">train_data_norm</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">, </span><span class="s1">max_neighbourhood_range</span><span class="s2">,</span>
+                                  <span class="s1">max_learning_rate</span><span class="s2">, </span><span class="s1">max_steps</span><span class="s2">, </span><span class="s1">label_var</span><span class="s2">, </span><span class="s1">train_y</span><span class="s2">)</span>
+
+    <span class="s3"># Button to display the SOM Plot GUI</span>
+    <span class="s1">display_button </span><span class="s2">= </span><span class="s1">Button</span><span class="s2">(</span><span class="s1">root</span><span class="s2">, </span><span class="s1">text</span><span class="s2">=</span><span class="s5">&quot;Display SOM Plot&quot;</span><span class="s2">, </span><span class="s1">command</span><span class="s2">=</span><span class="s0">lambda</span><span class="s2">: </span><span class="s1">display_som_plot_gui_func</span><span class="s2">(</span><span class="s1">label_map</span><span class="s2">, </span><span class="s1">max_steps</span><span class="s2">))</span>
+    <span class="s1">display_button</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s3"># Evaluate accuracy on the test set</span>
+    <span class="s1">test_data_norm </span><span class="s2">= </span><span class="s1">minmax_scaler</span><span class="s2">(</span><span class="s1">test_x</span><span class="s2">)</span>
+    <span class="s1">accuracy </span><span class="s2">= </span><span class="s1">evaluate_accuracy</span><span class="s2">(</span><span class="s1">test_data_norm</span><span class="s2">, </span><span class="s1">test_y</span><span class="s2">, </span><span class="s1">som</span><span class="s2">, </span><span class="s1">label_map</span><span class="s2">, </span><span class="s1">num_rows</span><span class="s2">, </span><span class="s1">num_cols</span><span class="s2">)</span>
+
+    <span class="s3"># Display accuracy in the GUI</span>
+    <span class="s1">label_var</span><span class="s2">.</span><span class="s1">set</span><span class="s2">(</span><span class="s5">f&quot;SOM training completed</span><span class="s0">\n</span><span class="s5">Accuracy: </span><span class="s0">{</span><span class="s1">accuracy</span><span class="s0">:</span><span class="s5">.2%</span><span class="s0">}</span><span class="s5">&quot;</span><span class="s2">)</span>
+
+<span class="s3"># Start the GUI</span>
+<span class="s0">def </span><span class="s1">initialize_gui</span><span class="s2">():</span>
+    <span class="s0">global </span><span class="s1">root</span>
+    <span class="s1">root </span><span class="s2">= </span><span class="s1">tk</span><span class="s2">.</span><span class="s1">Tk</span><span class="s2">()</span>
+    <span class="s1">root</span><span class="s2">.</span><span class="s1">title</span><span class="s2">(</span><span class="s5">&quot;SOM Training GUI&quot;</span><span class="s2">)</span>
+
+    <span class="s3"># Add a button to start SOM training</span>
+    <span class="s1">label_var </span><span class="s2">= </span><span class="s1">StringVar</span><span class="s2">()</span>
+    <span class="s1">label_var</span><span class="s2">.</span><span class="s1">set</span><span class="s2">(</span><span class="s5">&quot;Press the button to start SOM training&quot;</span><span class="s2">)</span>
+    <span class="s1">label </span><span class="s2">= </span><span class="s1">Label</span><span class="s2">(</span><span class="s1">root</span><span class="s2">, </span><span class="s1">textvariable</span><span class="s2">=</span><span class="s1">label_var</span><span class="s2">)</span>
+    <span class="s1">label</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s1">button </span><span class="s2">= </span><span class="s1">Button</span><span class="s2">(</span><span class="s1">root</span><span class="s2">, </span><span class="s1">text</span><span class="s2">=</span><span class="s5">&quot;Start SOM Training&quot;</span><span class="s2">, </span><span class="s1">command</span><span class="s2">=</span><span class="s0">lambda</span><span class="s2">: </span><span class="s1">on_button_click</span><span class="s2">(</span><span class="s1">label_var</span><span class="s2">))</span>
+    <span class="s1">button</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s1">pause_button </span><span class="s2">= </span><span class="s1">Button</span><span class="s2">(</span><span class="s1">root</span><span class="s2">, </span><span class="s1">text</span><span class="s2">=</span><span class="s5">&quot;Pause&quot;</span><span class="s2">, </span><span class="s1">command</span><span class="s2">=</span><span class="s1">on_pause_click</span><span class="s2">)</span>
+    <span class="s1">pause_button</span><span class="s2">.</span><span class="s1">pack</span><span class="s2">()</span>
+
+    <span class="s3"># Start the Tkinter main loop</span>
+    <span class="s1">root</span><span class="s2">.</span><span class="s1">mainloop</span><span class="s2">()</span>
+
+<span class="s3"># Start the GUI</span>
+<span class="s1">initialize_gui</span><span class="s2">()</span></pre>
+</body>
+</html>
